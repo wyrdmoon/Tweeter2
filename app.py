@@ -230,7 +230,9 @@ def follows():
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO user_follows(follow_id, login_token) VALUES (?,?)", [follow_id, login_token])
+            cursor.execute("SELECT user_id FROM user_session WHERE login_token = ?", [login_token])
+            user_id= cursor.fetchone()[0]
+            cursor.execute("INSERT INTO user_follows (follow_id, user_id )VALUES(?,?)", [follow_id, user_id])
             conn.commit()
             rows = cursor.rowcount
         except Exception as error:
