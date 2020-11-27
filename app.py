@@ -204,7 +204,7 @@ def follows():
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
-            cursor.execute("SELECT id FROM user_follows INNER JOIN users ON id;")
+            cursor.execute("SELECT u.id, u.username, u.email, u.bio, u.birthdate FROM user_follows uf INNER JOIN user u ON u.id = uf.user_id")
             users = cursor.fetchall()
         except Exception as error:
             print("Something went wrong : ")
@@ -219,6 +219,33 @@ def follows():
                 return Response(json.dumps(users, default=str), mimetype="application/json", status=200)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
+
+     
+    elif request.method == 'POST':
+        conn = None
+        cursor = None
+        login_token = request.json.get("login_token")
+        follow_id = request.json.get("follow_id")
+        rows = None
+        try:
+            conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO user_follows(follow_id, login_token) VALUES (?,?)", [follow_id, login_token])
+            conn.commit()
+            rows = cursor.rowcount
+        except Exception as error:
+            print("Something went wrong (THIS IS LAZY): ")
+            print(error)
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(rows == 1):
+                return Response("You followed", mimetype="text/html", status=201)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)       
 
 
     
