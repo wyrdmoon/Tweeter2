@@ -9,7 +9,7 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-
+#######################################users######################################################################
 @app.route('/api/user', methods=['GET', 'POST', 'PATCH', 'DELETE'])
 def user():
     if request.method == 'GET':
@@ -126,7 +126,7 @@ def user():
                 return Response("Delete Success", mimetype="text/html", status=204)
             else:
                 return Response("Delete Failed", mimetype="text/html", status=500)     
-    ###################################################################################
+    #######################user session############################################################
 @app.route('/api/login', methods=['POST', 'DELETE'])
 def user_session():
         
@@ -172,18 +172,17 @@ def user_session():
     elif request.method == 'DELETE':
         conn = None
         cursor = None
-        login_token = request.json.get("get")
-        
+        login_token = request.json.get("login_token")
         rows = None
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
-            cursor.execute("DELETE login_token FROM user_session WHERE login_token = (?)", [user, login_token])
+            cursor.execute("DELETE FROM user_session WHERE login_token = (?)", [login_token])
             conn.commit() 
             rows = cursor.rowcount    
         except Exception as error:
             print("Something went wrong (This is LAZY)")  
-            print("error")  
+            print(error)  
         finally: 
             if cursor != None:
                 cursor.close() 
@@ -191,8 +190,35 @@ def user_session():
                 conn.rollback()
                 conn.close()
             if (rows == 1):
-                return Response("Delete Success", mimetype="text/html", status=204)
+                return Response("Logout Success", mimetype="text/html", status=204)
             else:
-                return Response("Delete Failed", mimetype="text/html", status=500)     
-            
+                return Response("Logout Failed", mimetype="text/html", status=500)
+
+###########################################follows######################################################
+@app.route('/api/follows', methods=['GET', 'POST', 'DELETE'])
+def follows():
+    if request.method == 'GET':
+        conn = None
+        cursor = None
+        users = None
+        try:
+            conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM user_follows INNER JOIN users ON id;")
+            users = cursor.fetchall()
+        except Exception as error:
+            print("Something went wrong : ")
+            print(error)
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(users != None):
+                return Response(json.dumps(users, default=str), mimetype="application/json", status=200)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
+
+
     
