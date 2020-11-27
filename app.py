@@ -145,10 +145,15 @@ def user_session():
             user = cursor.fetchall()
             print(user)
             if len (user) == 1:
-               
-             cursor.execute ("INSERT INTO user_session (user_id, login_token) VALUES (?,?)", [random.random()]) 
-             conn.commit() 
-             rows = cursor.rowcount    
+             
+             cursor.execute ("INSERT INTO user_session (user_id, login_token) VALUES (?,?)", [user[0][0], random.random()]) 
+             
+             conn.commit()
+             rows = cursor.rowcount 
+            if(cursor.rowcount == 1):
+                print("Login successful")
+            else:
+                print("Error")        
             #generate a logintoken and insert to user session table
         except Exception as error:
             print("Something went wrong (THIS IS LAZY): ")
@@ -163,4 +168,31 @@ def user_session():
                 return Response("Logged In", mimetype="text/html", status=201)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
+    
+    elif request.method == 'DELETE':
+        conn = None
+        cursor = None
+        login_token = request.json.get("get")
+        
+        rows = None
+        try:
+            conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
+            cursor = conn.cursor()
+            cursor.execute("DELETE login_token FROM user_session WHERE login_token = (?)", [user, login_token])
+            conn.commit() 
+            rows = cursor.rowcount    
+        except Exception as error:
+            print("Something went wrong (This is LAZY)")  
+            print("error")  
+        finally: 
+            if cursor != None:
+                cursor.close() 
+            if conn != None:
+                conn.rollback()
+                conn.close()
+            if (rows == 1):
+                return Response("Delete Success", mimetype="text/html", status=204)
+            else:
+                return Response("Delete Failed", mimetype="text/html", status=500)     
+            
     
