@@ -278,7 +278,149 @@ def follows():
             if (rows == 1):
                 return Response("unfollow success", mimetype="text/html", status=204)
             else:
-                return Response("unfollow Failed", mimetype="text/html", status=500)             
+                return Response("unfollow Failed", mimetype="text/html", status=500)   
+    
+    ###################################followers############################################################# 
+@app.route('/api/followers', methods=['GET'])
+def followers():
+    if request.method == 'GET':
+        conn = None
+        cursor = None
+        user = None
+        try:
+            conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
+            cursor = conn.cursor()
+            cursor.execute("SELECT follow_id FROM user_follows")
+            user = cursor.fetchall()
+        except Exception as error:
+            print("Something went wrong : ")
+            print(error)
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(user != None):
+                return Response(json.dumps(user, default=str), mimetype="application/json", status=200)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)    
+            
+###########################################tweets###################################################################    
+@app.route('/api/tweet', methods=['GET', 'POST', 'PATCH', 'DELETE'])
+def tweet():
+    if request.method == 'GET':
+        conn = None
+        cursor = None
+        user = None
+        try:
+            conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM tweet")
+            user = cursor.fetchall()
+        except Exception as error:
+            print("Something went wrong : ")
+            print(error)
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(user != None):
+                return Response(json.dumps(user, default=str), mimetype="application/json", status=200)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
 
+  
+    elif request.method == 'POST':
+        conn = None
+        cursor = None
+        login_token = request.json.get("login_token")
+        tweet_id = request.json.get("tweet_id")
+        user_id = request.json.get("user_id")
+        username = request.json.get("username")
+        content = request.json.get("content")
+        created_at = request.json.get("created_at")
+        
+        rows = None
+        try:
+            conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
+            cursor = conn.cursor()
+            cursor.execute("SELECT user_id FROM tweet",)
+            user_id= cursor.fetchone()[0]
+            cursor.execute("INSERT INTO tweet(user_id, content)VALUES(?,?)", [user_id, content])
+            conn.commit()
+            rows = cursor.rowcount
+        except Exception as error:
+            print("Something went wrong (THIS IS LAZY): ")
+            print(error)
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(rows == 1):
+                return Response("tweet Posted", mimetype="text/html", status=201)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
+            
+    
+    elif request.method == "PATCH":
+        conn = None
+        cursor = None
+        tweet_id = request.json.get("tweet_id")
+        content = request.json.get("content")
+        rows = None
+        try:
+            conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
+            cursor = conn.cursor()
+            if user_id != "" and user_id != None:
+                cursor.execute("UPDATE user_id SET tweet_id=? WHERE login_token=?", [user_id, tweet_id])
+            if bio != "" and bio != None:
+                cursor.execute("UPDATE tweet_id SET content=? WHERE id=?", [content, tweet_id])
+           
+            conn.commit() 
+            rows = cursor.rowcount    
+        except Exception as error:
+            print("Something went wrong (This is LAZY)")  
+            print(error)  
+        finally: 
+            if cursor != None:
+                cursor.close() 
+            if conn != None:
+                conn.rollback()
+                conn.close()
+            if (rows == 1):
+                return Response("Updated Success", mimetype="text/html", status=204)
+            else:
+                return Response("Update Failed", mimetype="text/html", status=500)
+            
+    elif request.method == "DELETE":
+        conn = None
+        cursor = None 
+        login_token = request.json.get("login_token") 
+        tweet_id = request.json.get("tweet_id")
+        rows = None
+        try:
+            conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM tweet WHERE user_id = '?'",)
+            conn.commit() 
+            rows = cursor.rowcount    
+        except Exception as error:
+            print("Something went wrong (This is LAZY)")  
+            print(error)  
+        finally: 
+            if cursor != None:
+                cursor.close() 
+            if conn != None:
+                conn.rollback()
+                conn.close()
+            if (rows == 1):
+                return Response("Delete Success", mimetype="text/html", status=204)
+            else:
+                return Response("Delete Failed", mimetype="text/html", status=500)  
 
     
