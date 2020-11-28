@@ -426,4 +426,31 @@ def tweet():
             else:
                 return Response("Delete Failed", mimetype="text/html", status=500)  
 
+#######################################tweet-likes##################################################################
+@app.route('/api/tweet_like', methods=['GET', 'POST', 'DELETE'])
+def tweet_like():
+    if request.method == 'GET':
+        conn = None
+        cursor = None
+        users = None
+        try:
+            conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
+            cursor = conn.cursor()
+            cursor.execute("SELECT tweet_id FROM tweet_like")
+            users = cursor.fetchall()
+        except Exception as error:
+            print("Something went wrong : ")
+            print(error)
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(users != None):
+                return Response(json.dumps(users, default=str), mimetype="application/json", status=200)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
+
+
     
