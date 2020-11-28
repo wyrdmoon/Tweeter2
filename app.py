@@ -258,8 +258,7 @@ def follows():
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM user_follows WHERE follow_id = ?", [follow_id])
-           
+            cursor.execute("DELETE FROM user_follows WHERE id =?", [login_token, follow_id])
             conn.commit() 
             rows = cursor.rowcount    
         except Exception as error:
