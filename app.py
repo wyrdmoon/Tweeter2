@@ -11,7 +11,7 @@ CORS(app)
 
 #######################################users######################################################################
 @app.route('/api/user', methods=['GET', 'POST', 'PATCH', 'DELETE'])
-def user():
+def user_endpoint():
     if request.method == 'GET':
         conn = None
         cursor = None
@@ -128,7 +128,7 @@ def user():
                 return Response("Delete Failed", mimetype="text/html", status=500)     
     #######################user session############################################################
 @app.route('/api/login', methods=['POST', 'DELETE'])
-def user_session():
+def user_session_endpoint():
         
     if request.method == 'POST':
         conn = None
@@ -196,7 +196,7 @@ def user_session():
 
 ###########################################follows######################################################
 @app.route('/api/follows', methods=['GET', 'POST', 'DELETE'])
-def follows():
+def follows_endpoint():
     if request.method == 'GET':
         conn = None
         cursor = None
@@ -282,7 +282,7 @@ def follows():
     
     ###################################followers############################################################# 
 @app.route('/api/followers', methods=['GET'])
-def followers():
+def followers_endpoint():
     if request.method == 'GET':
         conn = None
         cursor = None
@@ -308,7 +308,7 @@ def followers():
             
 ###########################################tweets###################################################################    
 @app.route('/api/tweet', methods=['GET', 'POST', 'PATCH', 'DELETE'])
-def tweet():
+def tweet_endpoint():
     if request.method == 'GET':
         conn = None
         cursor = None
@@ -428,7 +428,7 @@ def tweet():
 
 #######################################tweet-likes##################################################################
 @app.route('/api/tweet_like', methods=['GET', 'POST', 'DELETE'])
-def tweet_like():
+def tweet_like_endpoint():
     if request.method == 'GET':
         conn = None
         cursor = None
@@ -449,6 +449,35 @@ def tweet_like():
                 conn.close()
             if(users != None):
                 return Response(json.dumps(users, default=str), mimetype="application/json", status=200)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
+            
+    
+    elif request.method == 'POST':
+        conn = None
+        cursor = None
+        login_token = request.json.get("login_token")
+        tweet_id = request.json.get("tweet_id")
+        rows = None
+        try:
+            conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
+            cursor = conn.cursor()
+            cursor.execute("SELECT user_id FROM user_session WHERE login_token = ?", [login_token])
+            user_id= cursor.fetchone()[0]
+            cursor.execute("INSERT INTO tweet_like (tweet_id, user_id)VALUES(?,?)", [tweet_id, user_id])
+            conn.commit()
+            rows = cursor.rowcount
+        except Exception as error:
+            print("Something went wrong (THIS IS LAZY): ")
+            print(error)
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(rows == 1):
+                return Response("You liked", mimetype="text/html", status=201)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
 
