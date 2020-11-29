@@ -536,18 +536,18 @@ def comments_endpoint():
     elif request.method == 'POST':
         conn = None
         cursor = None
-        comment_id = request.json.get("comment_id")
+        
         tweet_id = request.json.get("tweet_id")
-        user_id = request.json.get("user_id")
-        username = request.json.get("username")
+       
+       
         content = request.json.get("content")
-        created_at = request.json.get("created_at")
+        login_token = request.json.get("login_token")
         
         rows = None
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
-            cursor.execute("SELECT user_id FROM user_session",)
+            cursor.execute("SELECT user_id FROM user_session WHERE login_token =?", [login_token])
             user_id= cursor.fetchone()[0]
             cursor.execute("INSERT INTO comment(user_id, tweet_id, content)VALUES(?,?,?)", [user_id, tweet_id, content])
             conn.commit()
@@ -604,14 +604,14 @@ def comments_endpoint():
         conn = None
         cursor = None 
         login_token = request.json.get("login_token") 
-        comment_id = request.json.get("comment_id")
+        comment_id = request.json.get("commentId")
         rows = None
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
             cursor.execute("SELECT user_id FROM user_session WHERE login_token= ?", [login_token])
             user_id= cursor.fetchone()[0]
-            cursor.execute("DELETE FROM comment WHERE user_id= ? AND tweet_id = ?", [user_id, tweet_id])
+            cursor.execute("DELETE FROM comment WHERE user_id= ? AND id = ?", [user_id, comment_id])
             conn.commit() 
             rows = cursor.rowcount    
         except Exception as error:
