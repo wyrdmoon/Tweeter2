@@ -280,7 +280,7 @@ def follows_endpoint():
             else:
                 return Response("unfollow Failed", mimetype="text/html", status=500)   
     
-    ###################################followers############################################################# 
+########################################followers################################################################## 
 @app.route('/api/followers', methods=['GET'])
 def followers_endpoint():
     if request.method == 'GET':
@@ -337,12 +337,7 @@ def tweet_endpoint():
         conn = None
         cursor = None
         login_token = request.json.get("login_token")
-        tweet_id = request.json.get("tweet_id")
-        user_id = request.json.get("user_id")
-        username = request.json.get("username")
         content = request.json.get("content")
-        created_at = request.json.get("created_at")
-        
         rows = None
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
@@ -585,9 +580,9 @@ def comments_endpoint():
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
             if user_id != "" and user_id != None:
-                cursor.execute("UPDATE user_id SET comment_id=? WHERE login_token=?", [user_id, comment_id])
+                cursor.execute("UPDATE user_id SET content=? WHERE login_token=?", [user_id, tweet_id])
             if content != "" and content != None:
-                cursor.execute("UPDATE comment_id SET content=? WHERE id=?", [content, comment_id])
+                cursor.execute("UPDATE comment SET content=? WHERE id=?", [content, tweet_id])
            
             conn.commit() 
             rows = cursor.rowcount    
@@ -604,5 +599,33 @@ def comments_endpoint():
                 return Response("Updated Success", mimetype="text/html", status=204)
             else:
                 return Response("Update Failed", mimetype="text/html", status=500)
+            
+    elif request.method == "DELETE":
+        conn = None
+        cursor = None 
+        login_token = request.json.get("login_token") 
+        comment_id = request.json.get("comment_id")
+        rows = None
+        try:
+            conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
+            cursor = conn.cursor()
+            cursor.execute("SELECT user_id FROM user_session WHERE login_token= ?", [login_token])
+            user_id= cursor.fetchone()[0]
+            cursor.execute("DELETE FROM comment WHERE user_id= ? AND tweet_id = ?", [user_id, tweet_id])
+            conn.commit() 
+            rows = cursor.rowcount    
+        except Exception as error:
+            print("Something went wrong (This is LAZY)")  
+            print(error)  
+        finally: 
+            if cursor != None:
+                cursor.close() 
+            if conn != None:
+                conn.rollback()
+                conn.close()
+            if (rows == 1):
+                return Response("Delete Success", mimetype="text/html", status=204)
+            else:
+                return Response("Delete Failed", mimetype="text/html", status=500)  
 
     
