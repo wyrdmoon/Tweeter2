@@ -626,6 +626,61 @@ def comments_endpoint():
             if (rows == 1):
                 return Response("Delete Success", mimetype="text/html", status=204)
             else:
-                return Response("Delete Failed", mimetype="text/html", status=500)  
-
+                return Response("Delete Failed", mimetype="text/html", status=500)
+            
+ #################################comment-likes#################################################################
+@app.route('/api/comment_like', methods=['GET', 'POST', 'DELETE'])
+def comment_like_endpoint():
+    if request.method == 'GET':
+        conn = None
+        cursor = None
+        users = None
+        try:
+            conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
+            cursor = conn.cursor()
+            cursor.execute("SELECT comment_id FROM comment_like")
+            users = cursor.fetchall()
+        except Exception as error:
+            print("Something went wrong : ")
+            print(error)
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(users != None):
+                return Response(json.dumps(users, default=str), mimetype="application/json", status=200)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
+            
+    
+    elif request.method == 'POST':
+        conn = None
+        cursor = None
+        login_token = request.json.get("login_token")
+        comment_id = request.json.get("tweet_id")
+        username = request.json.get("username")
+        rows = None
+        try:
+            conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
+            cursor = conn.cursor()
+            cursor.execute("SELECT user_id FROM user_session WHERE login_token = ?", [login_token])
+            user_id= cursor.fetchone()[0]
+            cursor.execute("INSERT INTO comment_like (comment_id, user_id)VALUES(?,?)", [comment_id, user_id])
+            conn.commit()
+            rows = cursor.rowcount
+        except Exception as error:
+            print("Something went wrong (THIS IS LAZY): ")
+            print(error)
+        finally:
+            if(cursor != None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if(rows == 1):
+                return Response("You liked", mimetype="text/html", status=201)
+            else:
+                return Response("Something went wrong!", mimetype="text/html", status=500)
     
