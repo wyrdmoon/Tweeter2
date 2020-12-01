@@ -629,7 +629,7 @@ def comments_endpoint():
                 return Response("Delete Failed", mimetype="text/html", status=500)
             
  #################################comment-likes#################################################################
-@app.route('/api/comment_like', methods=['GET', 'POST', 'DELETE'])
+@app.route('/api/comment-likes', methods=['GET', 'POST', 'DELETE'])
 def comment_like_endpoint():
     if request.method == 'GET':
         conn = None
@@ -658,16 +658,18 @@ def comment_like_endpoint():
     elif request.method == 'POST':
         conn = None
         cursor = None
-        login_token = request.json.get("login_token")
-        comment_id = request.json.get("tweet_id")
-        username = request.json.get("username")
+        loginToken = request.json.get("loginToken")
+        commentId = request.json.get("commentId")
+        print(commentId)
         rows = None
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
-            cursor.execute("SELECT user_id FROM user_session WHERE login_token = ?", [login_token])
-            user_id= cursor.fetchone()[0]
-            cursor.execute("INSERT INTO comment_like (comment_id, user_id)VALUES(?,?)", [comment_id, user_id])
+            cursor.execute("SELECT user_id FROM user_session WHERE login_token = ?", [loginToken])
+            user_id = cursor.fetchone()[0]
+            print(user_id)
+           
+            cursor.execute("INSERT INTO comment_like (comment_id, user_id)VALUES(?,?)", [commentId, user_id])
             conn.commit()
             rows = cursor.rowcount
         except Exception as error:
@@ -682,5 +684,41 @@ def comment_like_endpoint():
             if(rows == 1):
                 return Response("You liked", mimetype="text/html", status=201)
             else:
-                return Response("Something went wrong!", mimetype="text/html", status=500)
+                return Response("this is a test!", mimetype="text/html", status=500)
+            
+          
+    elif request.method == 'DELETE':
+        conn = None
+        cursor = None
+        loginToken = request.json.get("loginToken")
+        commentId = request.json.get("commentId")
+        rows = None
+        try:
+            conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
+            cursor = conn.cursor()
+            cursor.execute("SELECT user_id FROM user_session WHERE login_token = ?", [loginToken])
+        
+            user_id= cursor.fetchone()[0]
+            print(user_id)
+            print(commentId)
+            cursor.execute("DELETE FROM comment_like WHERE user_id = ? AND comment_id =? ", [user_id, commentId])
+            conn.commit() 
+            rows = cursor.rowcount    
+        except Exception as error:
+            print("Something went wrong (This is LAZY)")  
+            print(error)  
+        finally: 
+            if cursor != None:
+                cursor.close() 
+            if conn != None:
+                conn.rollback()
+                conn.close()
+            if (rows == 1):
+                return Response("unlike success", mimetype="text/html", status=204)
+            else:
+                return Response("unlike Failed", mimetype="text/html", status=500)
+            
+          
+   
+    
     
