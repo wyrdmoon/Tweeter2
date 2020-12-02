@@ -72,15 +72,18 @@ def user_endpoint():
         bio = request.json.get("bio")
         birthdate = request.json.get("birthdate")
         email = request.json.get("email")
-        id =request.json.get("id")
+        loginToken =request.json.get("loginToken")
         rows = None
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
+            cursor.execute("SELECT user_id FROM user_session WHERE login_token = ?", [loginToken])
+        
+            user_id= cursor.fetchone()[0]
             if username != "" and username != None:
-                cursor.execute("UPDATE user SET username=? WHERE id=?", [username, id])
+                cursor.execute("UPDATE user SET username=? WHERE id=?", [username, user_id])
             if bio != "" and bio != None:
-                cursor.execute("UPDATE user SET bio=? WHERE id=?", [bio, id])
+                cursor.execute("UPDATE user SET bio=? WHERE id=?", [bio, user_id])
            
             conn.commit() 
             rows = cursor.rowcount    
@@ -100,17 +103,17 @@ def user_endpoint():
     
     elif request.method == "DELETE":
         conn = None
-        cursor = None 
-        username = request.json.get("username") 
-        bio = request.json.get("bio")
-        birthdate = request.json.get("birthdate")
-        email = request.json.get("email")
-        id =request.json.get("id")
+        cursor = None
+        loginToken = request.json.get("loginToken")
+        password = request.json.get("password")
         rows = None
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM user WHERE id=?", [id, username, bio, birthdate, email])
+            cursor.execute("SELECT user_id FROM user_session WHERE login_token = ?", [loginToken])
+        
+            user_id= cursor.fetchone()[0]
+            cursor.execute("DELETE FROM user WHERE id=? AND password= ?", [user_id, password])
             conn.commit() 
             rows = cursor.rowcount    
         except Exception as error:
@@ -395,16 +398,16 @@ def tweet_endpoint():
     elif request.method == "DELETE":
         conn = None
         cursor = None 
-        login_token = request.json.get("login_token") 
-        tweet_id = request.json.get("tweet_id")
+        loginToken = request.json.get("login_token") 
+        tweetId = request.json.get("tweet_id")
         rows = None
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
-            cursor.execute("SELECT user_id FROM user_session WHERE login_token = ?", [login_token])
+            cursor.execute("SELECT user_id FROM user_session WHERE login_token = ?", [loginToken])
         
             user_id= cursor.fetchone()[0]
-            cursor.execute("DELETE FROM tweet WHERE id = ? AND user_id = ? ",[tweet_id, user_id])
+            cursor.execute("DELETE FROM tweet WHERE id = ? AND user_id = ? ",[tweetId, user_id])
             conn.commit() 
             rows = cursor.rowcount    
         except Exception as error:
