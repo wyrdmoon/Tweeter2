@@ -519,10 +519,11 @@ def tweet_like_endpoint():
         conn = None
         cursor = None
         users = None
+        tweetId = request.json.get("tweetId")
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
-            cursor.execute("SELECT tweet_id FROM tweet_like")
+            cursor.execute("SELECT user.username, user.id, tweet_like.tweet_id FROM user INNER JOIN tweet_like ON user.id = tweet_like.user_id WHERE tweet_like.tweet_id =? ", [tweetId])
             users = cursor.fetchall()
         except Exception as error:
             print("Something went wrong : ")
@@ -534,7 +535,10 @@ def tweet_like_endpoint():
                 conn.rollback()
                 conn.close()
             if(users != None):
-                return Response(json.dumps(users, default=str), mimetype="application/json", status=200)
+                empty_array = []
+                for user in users:
+                   empty_array.append ({"tweetId":user[2], "userId":user [1], "username":user[0]})
+                return Response(json.dumps(empty_array, default=str), mimetype="application/json", status=200)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
             
@@ -570,8 +574,8 @@ def tweet_like_endpoint():
     elif request.method == 'DELETE':
         conn = None
         cursor = None
-        login_token = request.json.get("login_token")
-        tweet_id = request.json.get("tweet_id")
+        login_token = request.json.get("loginToken")
+        tweet_id = request.json.get("tweetId")
         rows = None
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
@@ -580,6 +584,7 @@ def tweet_like_endpoint():
         
             user_id= cursor.fetchone()[0]
             print(user_id)
+            
             print(tweet_id)
             cursor.execute("DELETE FROM tweet_like WHERE user_id = ? AND tweet_id =? ", [user_id, tweet_id])
             conn.commit() 
@@ -605,11 +610,18 @@ def comments_endpoint():
         conn = None
         cursor = None
         user = None
+        tweetId = request.args.get("tweetId")
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM comment")
+            if tweet_id != None:
+                cursor.execute("SELECT * FROM comment INNER JOIN user ON comment.user_id WHERE comment.tweet_id =?",[tweet_id])
+            else:
+                cursor.execute("SELECT * comment INNER JOIN tweet ON comment.tweet_id = tweet.id WHERE tweet_id =?", [tweet_id])
+           
+         
             user = cursor.fetchall()
+            print (user)
         except Exception as error:
             print("Something went wrong : ")
             print(error)
@@ -620,19 +632,23 @@ def comments_endpoint():
                 conn.rollback()
                 conn.close()
             if(user != None):
-                return Response(json.dumps(user, default=str), mimetype="application/json", status=200)
+                empty_array = []
+                for user in users:
+                  empty_array.append ({"commentId":user[1], "tweetId":user [3], "username":user[0], "content":user[1], "createdAt":createdAt[2],})
+                return Response(json.dumps(empty_array, default=str), mimetype="application/json", status=200)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
             
     elif request.method == 'POST':
         conn = None
         cursor = None
+        user = None
         
-        tweet_id = request.json.get("tweet_id")
-       
-       
+        tweetId = request.json.get("tweetId")
+        
         content = request.json.get("content")
-        login_token = request.json.get("login_token")
+        loginToken = request.json.get("loginToken")
+       
         
         rows = None
         try:
@@ -643,6 +659,9 @@ def comments_endpoint():
             cursor.execute("INSERT INTO comment(user_id, tweet_id, content)VALUES(?,?,?)", [user_id, tweet_id, content])
             conn.commit()
             rows = cursor.rowcount
+            comment_id = cursor.lastrowid
+            cursor.execute ("SELECT created_at from comment WHERE id =?", [comment_id])
+            createdAt = cursor.fetchone()[0]
         except Exception as error:
             print("Something went wrong (THIS IS LAZY): ")
             print(error)
@@ -653,9 +672,12 @@ def comments_endpoint():
                 conn.rollback()
                 conn.close()
             if(rows == 1):
-                return Response("comment Posted", mimetype="text/html", status=201)
+               empty_array = []
+               for user in users:
+                  empty_array.append ({"userId":user[0], "content":user[1],"createdAt":user[3], "tweetId":user[2]})
+               return Response(json.dumps(empty_array, default=str), mimetype="application/json", status=201)
             else:
-                return Response("Something went wrong!", mimetype="text/html", status=500)
+               return Response("Something went wrong!", mimetype="text/html", status=500)
             
     elif request.method == "PATCH":
         conn = None
