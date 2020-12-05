@@ -3,14 +3,15 @@ from flask import Flask, request, Response
 import json
 import dbcreds
 import random
-import string 
+import string
+import secrets
 from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
 
 #######################################users######################################################################
-@app.route('/api/user', methods=['GET', 'POST', 'PATCH', 'DELETE'])
+@app.route('/api/users', methods=['GET', 'POST', 'PATCH', 'DELETE'])
 def user_endpoint():
     if request.method == 'GET':
         userId = request.args.get("userId")
@@ -38,7 +39,7 @@ def user_endpoint():
             if(users != None):
                 empty_array = []
                 for user in users:
-                    empty_array.append ({"user_id":user[0], "email":user[2], "username":user[1], "bio":user[3], "birthdate":user[4]})
+                    empty_array.append ({"userId":user[0], "email":user[2], "username":user[1], "bio":user[3], "birthdate":user[4]})
                 return Response(json.dumps(empty_array, default=str), mimetype="application/json", status=200)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
@@ -60,6 +61,10 @@ def user_endpoint():
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
             cursor.execute("INSERT INTO user(username, bio, birthdate, email, password) VALUES (?,?,?,?,?)", [username,bio, birthdate, email, password])
+            conn.commit()
+            userId = cursor.lastrowid
+            loginToken=secrets.token_urlsafe(20)
+            cursor.execute("INSERT INTO user_session (user_id, login_token) VALUES (?,?)", [userId, loginToken])
             rows = cursor.rowcount
         except Exception as error:
             print("Something went wrong (THIS IS LAZY): ")
@@ -71,9 +76,17 @@ def user_endpoint():
                 conn.rollback()
                 conn.close()
             if(rows == 1):
+                user={
+                    "userId": userId,
+                    "email": email,
+                    "username": username,
+                    "bio": bio,
+                    "birthdate": birthdate,
+                    "loginToken": loginToken
+                }
            
                
-                return Response("bio Posted", mimetype="text/html", status=201)
+                return Response(json.dumps(user, default=str), mimetype="application/json", status=201)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
     
@@ -85,21 +98,32 @@ def user_endpoint():
         bio = request.json.get("bio")
         birthdate = request.json.get("birthdate")
         email = request.json.get("email")
+        password = request.json.get("password")
         loginToken =request.json.get("loginToken")
         rows = None
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
             cursor.execute("SELECT user_id FROM user_session WHERE login_token = ?", [loginToken])
-        
+            
+            
             user_id= cursor.fetchone()[0]
+            print(user_id)
             if username != "" and username != None:
                 cursor.execute("UPDATE user SET username=? WHERE id=?", [username, user_id])
             if bio != "" and bio != None:
                 cursor.execute("UPDATE user SET bio=? WHERE id=?", [bio, user_id])
+            if password != "" and password != None:
+                cursor.execute("UPDATE user SET password=? WHERE id=?", [password, user_id])
+            if email != "" and email != None:
+                cursor.execute("UPDATE user SET email=? WHERE id=?", [email, user_id])
+            if birthdate != "" and birthdate != None:
+                cursor.execute("UPDATE user SET birthdate=? WHERE id=?", [birthdate, user_id])
            
             conn.commit() 
-            rows = cursor.rowcount    
+            rows = cursor.rowcount 
+            cursor.execute("SELECT * FROM user WHERE id = ?", [user_id])
+            user = cursor.fetchone()   
         except Exception as error:
             print("Something went wrong (This is LAZY)")  
             print(error)  
@@ -110,10 +134,9 @@ def user_endpoint():
                 conn.rollback()
                 conn.close()
             if (rows == 1):
-                empty_array = []
-                for user in user:
-                    empty_array.append ({"user_id":user[0], "email":user[2], "username":user[1], "bio":user[3], "birthdate":user[4]})
-                return Response("Updated Success", mimetype="text/html", status=204)
+                print(user)
+                user_u = {"userId":user[0], "email":user[2], "username":user[1], "bio":user[3], "birthdate":user[4]}
+                return Response(json.dumps(user_u), mimetype="application/json", status=200)
             else:
                 return Response("Update Failed", mimetype="text/html", status=500)
     
@@ -159,20 +182,17 @@ def user_session_endpoint():
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
-            cursor.execute ("SELECT id, email, password FROM user WHERE email = ? AND password = ? ", [email, password])
+            cursor.execute ("SELECT * FROM user WHERE email = ? AND password = ? ", [email, password])
             
             user = cursor.fetchall()
+            loginToken=secrets.token_urlsafe(20)
             print(user)
             if len (user) == 1:
              
-             cursor.execute ("INSERT INTO user_session (user_id, login_token) VALUES (?,?)", [user[0][0], random.random()]) 
-             
-             conn.commit()
-             rows = cursor.rowcount 
-            if(cursor.rowcount == 1):
-                print("Login successful")
-            else:
-                print("Error")        
+                cursor.execute ("INSERT INTO user_session (user_id, login_token) VALUES (?,?)", [user[0][0], loginToken]) 
+                conn.commit()
+                rows = cursor.rowcount 
+           
             #generate a logintoken and insert to user session table
         except Exception as error:
             print("Something went wrong (THIS IS LAZY): ")
@@ -184,19 +204,28 @@ def user_session_endpoint():
                 conn.rollback()
                 conn.close()
             if(rows == 1):
-                return Response("Logged In", mimetype="text/html", status=201)
+                user={
+                    "userId": user[0][0],
+                    "email": email,
+                    "username": user[0][1],
+                    "bio": user[0][3],
+                    "birthdate": user[0][4],
+                    "loginToken": loginToken
+                }
+           
+                return Response(json.dumps(user,default=str), mimetype="application/json", status=201)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
     
     elif request.method == 'DELETE':
         conn = None
         cursor = None
-        login_token = request.json.get("login_token")
+        login_token = request.json.get("loginToken")
         rows = None
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM user_session WHERE login_token = (?)", [login_token])
+            cursor.execute("DELETE FROM user_session WHERE login_token = ?", [login_token])
             conn.commit() 
             rows = cursor.rowcount    
         except Exception as error:
@@ -220,10 +249,11 @@ def follows_endpoint():
         conn = None
         cursor = None
         users = None
+        userId = request.args.get()
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
-            cursor.execute("SELECT u.id, u.username, u.email, u.bio, u.birthdate FROM user_follows uf INNER JOIN user u ON u.id = uf.user_id")
+            cursor.execute("SELECT u.id, u.username, u.email, u.bio, u.birthdate FROM user_follows uf INNER JOIN user u ON u.id = uf.userId =?,"[userId])
             users = cursor.fetchall()
         except Exception as error:
             print("Something went wrong : ")
@@ -235,7 +265,10 @@ def follows_endpoint():
                 conn.rollback()
                 conn.close()
             if(users != None):
-                return Response(json.dumps(users, default=str), mimetype="application/json", status=200)
+                empty_array = []
+                for user in users:
+                     empty_array.append ({"userId":user[0], "email":user[2], "username":user[1], "bio":user[3], "birthdate":user[4]})
+                return Response(json.dumps(empty_array, default=str), mimetype="application/json", status=200)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
 
@@ -243,14 +276,15 @@ def follows_endpoint():
     elif request.method == 'POST':
         conn = None
         cursor = None
-        login_token = request.json.get("login_token")
-        follow_id = request.json.get("follow_id")
+        login_token = request.json.get("loginToken")
+        follow_id = request.json.get("followId")
         rows = None
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
             cursor.execute("SELECT user_id FROM user_session WHERE login_token = ?", [login_token])
             user_id= cursor.fetchone()[0]
+            print(user_id)
             cursor.execute("INSERT INTO user_follows (follow_id, user_id )VALUES(?,?)", [follow_id, user_id])
             conn.commit()
             rows = cursor.rowcount
@@ -264,24 +298,25 @@ def follows_endpoint():
                 conn.rollback()
                 conn.close()
             if(rows == 1):
-                return Response("You followed", mimetype="text/html", status=201)
+                return Response("You followed", mimetype="text/html", status=204)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
     
     elif request.method == 'DELETE':
         conn = None
         cursor = None
-        login_token = request.json.get("login_token")
-        follow_id = request.json.get("follow_id")
+        login_token = request.json.get("loginToken")
+        follow_id = request.json.get("followId")
         rows = None
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
-            cursor.execute("SELECT user_id FROM user_session WHERE login_token = ?", [login_token])
-        
-            user_id= cursor.fetchone()[0]
-            print(user_id)
+            cursor.execute("SELECT * FROM user_session WHERE login_token = ?", [login_token])
             print(follow_id)
+            user_id= cursor.fetchone()[0]
+            
+            print(user_id)
+            
             cursor.execute("DELETE FROM user_follows WHERE user_id = ? AND follow_id =? ", [user_id, follow_id])
             conn.commit() 
             rows = cursor.rowcount    
@@ -303,14 +338,16 @@ def follows_endpoint():
 @app.route('/api/followers', methods=['GET'])
 def followers_endpoint():
     if request.method == 'GET':
+        userId = request.args.get("userId")
         conn = None
         cursor = None
         user = None
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
-            cursor.execute("SELECT follow_id FROM user_follows")
-            user = cursor.fetchall()
+            if userId != None:
+                cursor.execute("SELECT u.id, u.username, u.email, u.bio, u.birthdate FROM user_follows uf INNER JOIN user u ON u.id = uf.user_id WHERE uf.follow_id = ?",[userId])
+                users = cursor.fetchall()
         except Exception as error:
             print("Something went wrong : ")
             print(error)
@@ -320,8 +357,11 @@ def followers_endpoint():
             if(conn != None):
                 conn.rollback()
                 conn.close()
-            if(user != None):
-                return Response(json.dumps(user, default=str), mimetype="application/json", status=200)
+            if(users != None):
+                empty_array = []
+                for user in users:
+                    empty_array.append ({"userId":user[0], "email":user[2], "username":user[1], "bio":user[3], "birthdate":user[4]})
+                return Response(json.dumps(empty_array, default=str), mimetype="application/json", status=200)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)    
             
@@ -333,11 +373,15 @@ def tweet_endpoint():
         conn = None
         cursor = None
         tweets = None
+        userId = request.args.get("userId")
       
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM tweet INNER JOIN user ON user.id = tweet.user_id ")
+            if userId != None:
+                cursor.execute("SELECT * FROM tweet INNER JOIN user ON user.id = tweet.user_id WHERE tweet.user_id = ?", [userId,])
+            else:
+                cursor.execute("SELECT * FROM tweet INNER JOIN user ON user.id = tweet.user_id ")
             tweets = cursor.fetchall()
         except Exception as error:
             print("Something went wrong : ")
@@ -361,17 +405,25 @@ def tweet_endpoint():
     elif request.method == 'POST':
         conn = None
         cursor = None
-        login_token = request.json.get("login_token")
+        login_token = request.json.get("loginToken")
         content = request.json.get("content")
         rows = None
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
-            cursor.execute("SELECT user_id FROM tweet",)
+          
+        
+           
+            cursor.execute("SELECT user_id FROM user_session WHERE login_token = ?", [login_token])
             user_id= cursor.fetchone()[0]
-            cursor.execute("INSERT INTO tweet(user_id, content)VALUES(?,?)", [user_id, content])
+            cursor.execute("SELECT username FROM user WHERE id = ?", [user_id])
+            username= cursor.fetchone()[0]
+            cursor.execute("INSERT INTO tweet(user_id, content)VALUES (?,?)", [user_id, content])
             conn.commit()
             rows = cursor.rowcount
+            tweetId = cursor.lastrowid
+            cursor.execute ("SELECT created_at from tweet WHERE id =?", [tweetId])
+            createdAt = cursor.fetchone()[0]
         except Exception as error:
             print("Something went wrong (THIS IS LAZY): ")
             print(error)
@@ -382,7 +434,14 @@ def tweet_endpoint():
                 conn.rollback()
                 conn.close()
             if(rows == 1):
-                return Response("tweet Posted", mimetype="text/html", status=201)
+                tweet ={
+                    "tweetId" : tweetId,
+                    "userId" : user_id,
+                    "username": username,
+                    "content": content,
+                    "createdAt": createdAt
+                }
+                return Response(json.dumps(tweet, default=str), mimetype="application/json", status=201)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
             
@@ -390,16 +449,19 @@ def tweet_endpoint():
     elif request.method == "PATCH":
         conn = None
         cursor = None
-        tweetId = request.json.get("tweet_id")
+        loginToken = request.json.get("loginToken")
+        tweetId = request.json.get("tweetId")
         content = request.json.get("content")
         rows = None
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
+            cursor.execute("SELECT user_id FROM user_session WHERE login_token = ?", [loginToken])
+        
+            user_id= cursor.fetchone()[0]
             if user_id != "" and user_id != None:
-                cursor.execute("UPDATE user_id SET tweet_id=? WHERE login_token=?", [user_id, tweet_id])
-            if bio != "" and bio != None:
-                cursor.execute("UPDATE tweet_id SET content=? WHERE id=?", [content, tweet_id])
+                cursor.execute("UPDATE tweet SET content=? WHERE user_id = ? AND id =?", [content, user_id, tweetId,])
+          
            
             conn.commit() 
             rows = cursor.rowcount    
@@ -413,15 +475,19 @@ def tweet_endpoint():
                 conn.rollback()
                 conn.close()
             if (rows == 1):
-                return Response("Updated Success", mimetype="text/html", status=204)
+                user ={
+                    "tweetId": tweetId,
+                    "content": content
+                }
+                return Response(json.dumps(user, default=str), mimetype="application/json", status=200)
             else:
                 return Response("Update Failed", mimetype="text/html", status=500)
             
     elif request.method == "DELETE":
         conn = None
         cursor = None 
-        loginToken = request.json.get("login_token") 
-        tweetId = request.json.get("tweet_id")
+        loginToken = request.json.get("loginToken") 
+        tweetId = request.json.get("tweetId")
         rows = None
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
