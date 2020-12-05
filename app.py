@@ -609,19 +609,15 @@ def comments_endpoint():
     if request.method == 'GET':
         conn = None
         cursor = None
-        user = None
+        users = None
         tweetId = request.args.get("tweetId")
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
-            if tweet_id != None:
-                cursor.execute("SELECT * FROM comment INNER JOIN user ON comment.user_id WHERE comment.tweet_id =?",[tweet_id])
-            else:
-                cursor.execute("SELECT * comment INNER JOIN tweet ON comment.tweet_id = tweet.id WHERE tweet_id =?", [tweet_id])
-           
-         
-            user = cursor.fetchall()
-            print (user)
+            if tweetId != None:
+                cursor.execute("SELECT * FROM comment INNER JOIN user ON comment.user_id WHERE comment.tweet_id =?",[tweetId])
+                users = cursor.fetchall()
+            print (users)
         except Exception as error:
             print("Something went wrong : ")
             print(error)
@@ -631,10 +627,10 @@ def comments_endpoint():
             if(conn != None):
                 conn.rollback()
                 conn.close()
-            if(user != None):
+            if(users != None):
                 empty_array = []
                 for user in users:
-                  empty_array.append ({"commentId":user[1], "tweetId":user [3], "username":user[0], "content":user[1], "createdAt":createdAt[2],})
+                  empty_array.append ({"commentId":user[0], "tweetId":user [3], "username":user[6], "content":user[1], "createdAt":user[2],})
                 return Response(json.dumps(empty_array, default=str), mimetype="application/json", status=200)
             else:
                 return Response("Something went wrong!", mimetype="text/html", status=500)
@@ -643,25 +639,24 @@ def comments_endpoint():
         conn = None
         cursor = None
         user = None
-        
+        comment = None
         tweetId = request.json.get("tweetId")
-        
         content = request.json.get("content")
         loginToken = request.json.get("loginToken")
-       
-        
         rows = None
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
-            cursor.execute("SELECT user_id FROM user_session WHERE login_token =?", [login_token])
-            user_id= cursor.fetchone()[0]
-            cursor.execute("INSERT INTO comment(user_id, tweet_id, content)VALUES(?,?,?)", [user_id, tweet_id, content])
+            cursor.execute("SELECT user_id FROM user_session WHERE login_token =?", [loginToken])
+            userId= cursor.fetchone()[0]
+            cursor.execute("INSERT INTO comment(user_id, tweet_id, content)VALUES(?,?,?)", [userId, tweetId, content])
             conn.commit()
+            
             rows = cursor.rowcount
-            comment_id = cursor.lastrowid
-            cursor.execute ("SELECT created_at from comment WHERE id =?", [comment_id])
-            createdAt = cursor.fetchone()[0]
+            commentId = cursor.lastrowid
+            cursor.execute ("SELECT created_at FROM comment INNER JOIN user ON user.id = comment.user_id WHERE comment.id =? " [commentId])
+            comment = cursor.fetchone()
+            conn.commit()
         except Exception as error:
             print("Something went wrong (THIS IS LAZY): ")
             print(error)
@@ -672,9 +667,9 @@ def comments_endpoint():
                 conn.rollback()
                 conn.close()
             if(rows == 1):
-               empty_array = []
-               for user in users:
-                  empty_array.append ({"userId":user[0], "content":user[1],"createdAt":user[3], "tweetId":user[2]})
+               
+               
+               returnValue ={"userId":comment[0], "content":comment[1],"createdAt":comment[2], "tweetId":comment[3]}
                return Response(json.dumps(empty_array, default=str), mimetype="application/json", status=201)
             else:
                return Response("Something went wrong!", mimetype="text/html", status=500)
@@ -682,20 +677,21 @@ def comments_endpoint():
     elif request.method == "PATCH":
         conn = None
         cursor = None
-        comment_id = request.json.get("comment_id")
-        tweet_id = request.json.get("tweet_id")
-        user_id = request.json.get("user_id")
-        username = request.json.get("username")
+        commentId = request.json.get("commentId")
+        tweetId = request.json.get("tweetId")
+        loginToken = request.json.get("loginToken")
         content = request.json.get("content")
-        created_at = request.json.get("created_at")
+        
         rows = None
         try:
             conn = mariadb.connect(host=dbcreds.host, password=dbcreds.password, user=dbcreds.user, port=dbcreds.port, database=dbcreds.database)
             cursor = conn.cursor()
             if user_id != "" and user_id != None:
-                cursor.execute("UPDATE user_id SET content=? WHERE login_token=?", [user_id, tweet_id])
+                cursor.execute("SELECT user_id from user_session  WHERE login_token=?", [loginToken])
+                user_id = cursor.fetchone([0])
+                print(user_id)
             if content != "" and content != None:
-                cursor.execute("UPDATE comment SET content=? WHERE id=?", [content, tweet_id])
+                cursor.execute("UPDATE comment SET content=? WHERE id=? AND user_id =?" , [content, tweet_id, user_id])
            
             conn.commit() 
             rows = cursor.rowcount    
